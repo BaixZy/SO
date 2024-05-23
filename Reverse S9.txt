@@ -1,0 +1,69 @@
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
+
+int main(int argc, char* argv[]) {
+    // Abrir archivo para lectura
+    int fd = open("./file", O_RDONLY);
+    if (fd == -1) {
+        perror("Error opening file for reading");
+        exit(EXIT_FAILURE);
+    }
+
+    // Abrir/crear archivo para escritura
+    int fd2 = open("./file.inv", O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    if (fd2 == -1) {
+        perror("Error opening file for writing");
+        close(fd);
+        exit(EXIT_FAILURE);
+    }
+
+    // Obtener el tamaño del archivo
+    off_t file_size = lseek(fd, 0, SEEK_END);
+    if (file_size == -1) {
+        perror("Error seeking to end of file");
+        close(fd);
+        close(fd2);
+        exit(EXIT_FAILURE);
+    }
+
+    // Leer y escribir en reversa
+    char c;
+    off_t offset = file_size;
+
+    while (offset > 0) {
+        // Decrementar offset y buscar en esa posición
+        offset--;
+        if (lseek(fd, offset, SEEK_SET) == -1) {
+            perror("Error seeking in file");
+            close(fd);
+            close(fd2);
+            exit(EXIT_FAILURE);
+        }
+
+        // Leer un byte desde esa posición
+        if (read(fd, &c, 1) != 1) {
+            perror("Error reading from file");
+            close(fd);
+            close(fd2);
+            exit(EXIT_FAILURE);
+        }
+
+        // Escribir el byte leído en el archivo destino
+        if (write(fd2, &c, 1) != 1) {
+            perror("Error writing to file");
+            close(fd);
+            close(fd2);
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    // Cerrar archivos
+    close(fd);
+    close(fd2);
+
+    return 0;
+}
