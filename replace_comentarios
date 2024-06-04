@@ -1,0 +1,47 @@
+#include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+void Usage()
+{
+	printf("Usage: ./replace fitxer caracter_a_cercar caracter_nou\n");
+	exit(1);
+}
+
+int main(int argc, char *argv[])
+{
+	if (argc != 4)
+		Usage();
+
+	// Obrim l'arxiu amb O_RDWR
+	// També existeix la possibilitat de fer dos opens, un de lectura
+	// i un altre d'escriptura.
+	int fd = open(argv[1], O_RDWR);
+	if (fd < 0) {
+		perror("Error en el open");
+		return 1;
+	}
+
+	// Transformem a caràcter argv[2] i argv[3]. Com que son strings,
+	// agafem la primera lletra.
+	char cerca = argv[2][0];// estàs accedint al primer caràcter d'aquesta cadena.
+	char replace = argv[3][0]; // estàs accedint al primer caràcter d'aquesta cadena.
+
+	char curr;
+	// Llegim els caràcters de l'arxiu d'un en un.
+	while (read(fd, &curr, sizeof(char)) > 0) {
+		if (curr == cerca) {
+			// Trobem un hit, l'hem de reemplaçar.
+			// Tornem just abans del caràcter que hem llegit
+			lseek(fd, -1, SEEK_CUR);
+			// I el sobreescribim
+			write(fd, &replace, sizeof(char));
+		}
+	}
+
+	// Tanquem l'arxiu
+	close(fd);
+
+	return 0;
+}

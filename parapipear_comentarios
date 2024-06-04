@@ -1,0 +1,83 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+void Usage()
+{
+	printf("Usage: ./parapipear text\n");
+	exit(1);
+}
+
+int main(int argc, char *argv[])
+{
+	if (argc != 2)
+		Usage();
+
+	int pipe1[2], pipe2[2];
+
+	// Creem les dues pipes
+	pipe(pipe1);
+	pipe(pipe2);
+
+	// Creem el primer fill
+	int ret = fork();
+	if (ret == 0) {
+		// Ara, cat haurà de tenir l'extrem de lectura de la primera
+		// pipe a l'entrada estàndard (canal 0), i l'extrem d'escriptura
+		// de la segona a la sortida estàndard (canal 1).
+		// La resta els tancarem tots.
+
+		dup2(pipe1[0], 0); //El hijo lee de la pipe1
+		dup2(pipe2[1], 1); //El hijo escribe en la pipe2
+
+		close(pipe1[0]);
+		close(pipe1[1]);
+		close(pipe2[0]);
+		// Important tancar el canal duplicat també
+		close(pipe2[1]);
+
+		execlp("cat", "cat", NULL);
+		printf("Error al execlp\n");
+		return 1;
+	}
+
+	// Ara ja no necessitem els extrems que hem redirigit a cat
+	// Això ho podem tancar més tard, però llavors haurem de
+	// recordar tancar-los també al segon fill
+	close(pipe1[0]);
+	close(pipe2[1]);
+
+	// Segon fork, segon fill
+	ret = fork();
+
+	if (ret == 0) {
+		// Necessitem el extrem de lectura de la segona pipe
+		// al canal 0, i tancar la resta.
+		dup2(pipe2[0], 0); //El hijo lee de la pipe2
+
+		close(pipe2[0]);
+		close(pipe1[1]);
+
+		execlp("wc", "wc", "-c", NULL);
+		printf("Error al execlp\n");
+		return 1;
+	}
+
+	// Ara ja no ens cal l'extrem de lectura de la pipe 2
+	// Això no és imprescindible
+	close(pipe2[0]);
+
+	// El pare ha d'escriure doncs el text per l'extrem d'escriptura
+	// de la pipe 1.
+	write(pipe1[1], argv[1], strlen(argv[1]));
+
+	// Ara tanquem l'extrem d'escriptura, sino cat mai acabarà,
+	// i esperem als fills.
+	close(pipe1[1]);
+
+	while (waitpid(-1, NULL, 0) > 0);
+
+	return 0;
+}
